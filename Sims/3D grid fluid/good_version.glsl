@@ -5,8 +5,14 @@ based on fluid sim by threedashes
 #define input_vel_tex sTD3DInputs[0] 
 #define obstacle_tex sTD3DInputs[2] 
 
-uniform float u_vel_factor, u_vel_decay, u_temp_decay;
-uniform vec3 u_const_vel;
+uniform float u_vel_factor, u_vel_decay, u_temp_decay, u_time_step;
+uniform vec3 u_const_vel, u_boy_dir;
+
+
+vec3 safenorm3(vec3 v){
+	v = normalize(v);
+	return any(isinf(v)) || any(isnan(v)) ? vec3(0) : v;
+}
 
 out vec4 fragColor;
 void main()
@@ -16,35 +22,25 @@ void main()
 	vec4 inp_vel = texture(input_vel_tex, coord);
 	
 	fb.xyz *= u_vel_decay;
-	fb.w *= u_temp_decay; 
+	//fb.w *= u_temp_decay; 
 	
 	vec4 new_vel = fb + (inp_vel * u_vel_factor);
 	new_vel.xyz += u_const_vel;
+	
+	
+	const float u_buoy_alpha = 1.0;
+	const float u_buoy_beta = 0.05;
+	const float u_ambient_temp = 0.0;
+	
+	new_vel.xyz += safenorm3(u_boy_dir)* u_time_step * fb.w; //temp injection
 	
 	vec4 oColor = vec4(new_vel);
 	
 	fragColor = TDOutputSwizzle(oColor);
 }
 
+
 ---RK4 ADVECTION---
-#define source_tex sTD3DInputs[0] 
-#define vel_tex sTD3DInputs[1] 
-
-
-vec3 rk4advection(sampler3D v_tex, vec3 coord, vec3 inv_dim, float time_step){
-	vec3 pos = coord;
-	
-	vec3 k1 = texture(v_tex, pos).xyz * inv_dim * time_step;
-	vec3 k2 = texture(v_tex, pos - k1 * 0.5).xyz * inv_dim * time_step;
-	vec3 k3 = texture(v_tex, pos - k2 * 0.5).xyz * inv_dim * time_step;
-	vec3 k4 = texture(v_tex, pos - k3).xyz * inv_dim * time_step;
-	
-	vec3 offset = (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0;
-	
-	return pos - offset.xyz;
-}
-
---- MACCORMACK ADVECTION ---
 #define source_tex sTD3DInputs[0]
 #define vel_tex    sTD3DInputs[1]
 
@@ -90,23 +86,38 @@ void main() {
     fragColor = TDOutputSwizzle(phi_clamped);
 }
 
+--- MACCORMACK ADVECTION ---
+#define source_tex sTD3DInputs[0]
+#define vel_tex    sTD3DInputs[1]
+
 uniform float u_time_step;
-uniform vec3 u_inv_dim;
-out vec4 fragColor;
-void main()
-{
-	vec3 coord = vUV.xyz;
+uniform vec3  u_inv_dim;
+uniform float u_clamp_strength;
+
+vec3 rk4advection(sampler3D v_tex, vec3 coord, vec3 inv_dim, float time_step){
 	vec3 pos = coord;
 	
-	vec3 advected_pos = rk4advection(vel_tex, coord, u_inv_dim, u_time_step);
+	vec3 k1 = texture(v_tex, pos).xyz * inv_dim * time_step;
+	vec3 k2 = texture(v_tex, pos - k1 * 0.5).xyz * inv_dim * time_step;
+	vec3 k3 = texture(v_tex, pos - k2 * 0.5).xyz * inv_dim * time_step;
+	vec3 k4 = texture(v_tex, pos - k3).xyz * inv_dim * time_step;
 	
-	vec4 a_vel = texture(source_tex, advected_pos);
-
-		
-	vec4 oColor = vec4(a_vel);
-	fragColor = TDOutputSwizzle(oColor);
+	vec3 offset = (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0;
+	
+	return pos - offset.xyz;
 }
 
+out vec4 fragColor;
+
+void main() {
+    vec3 coord = vUV.xyz;
+	vec3 adv_pos = rk4advection(vel_tex, coord, u_inv_dim, u_time_step);
+	vec4 oColor;
+	oColor = texture(source_tex, adv_pos);
+
+		
+    fragColor = TDOutputSwizzle(oColor);
+}
 
 --COMPUTE CURL---
 #define vel_tex sTD3DInputs[0] 
@@ -146,19 +157,15 @@ void main()
 }
 
 
-
 ---COMPUTE VORTICITY---
 #define vel_tex sTD3DInputs[0] 
 #define curl_tex sTD3DInputs[1] 
 
-uniform float u_time_step, u_vorticity;
+uniform float u_time_step, u_vorticity, u_temp_diffusion;
 
-vec3 safenorm3(vec3 v) {
-    float len = length(v);
-    if (len < 1e-6) {
-        return vec3(0.0);
-    }
-    return v / len;
+vec3 safenorm3(vec3 v){
+	v = normalize(v);
+	return any(isinf(v)) || any(isnan(v)) ? vec3(0) : v;
 }
 
 out vec4 fragColor;
@@ -169,7 +176,7 @@ void main()
 	vec4 vel = texture(vel_tex, coord);
 	
 	float vort_carry = vel.w;
-	vort_carry = clamp(vort_carry,0.0,1.0);
+	float temp_factor = smoothstep(0.0, 1.0, abs(vort_carry - 0.5) * 1.0);
 	
 	float curl_mag = texture(curl_tex, coord).w;
 	float curl_x = textureOffset(curl_tex, coord, ivec3(1,0,0)).w - textureOffset(curl_tex, coord, ivec3(-1,0,0)).w;
@@ -181,15 +188,26 @@ void main()
 	vec3 curl_grad_norm = safenorm3(curl_gradient);
 	
 	vec3 vorticity_force = cross(curl_grad_norm, curl_norm) * curl_mag;
-	vorticity_force *= u_vorticity * u_time_step * vort_carry;
+	vorticity_force *= u_vorticity * u_time_step * temp_factor;
+	
+	//temp diffuse
+	float temp_center = texture(vel_tex, coord).w;
+	float temp_neighbors = (
+		textureOffset(vel_tex, coord, ivec3(1,0,0)).w +
+		textureOffset(vel_tex, coord, ivec3(-1,0,0)).w +
+		textureOffset(vel_tex, coord, ivec3(0,1,0)).w +
+		textureOffset(vel_tex, coord, ivec3(0,-1,0)).w +
+		textureOffset(vel_tex, coord, ivec3(0,0,1)).w +
+		textureOffset(vel_tex, coord, ivec3(0,0,-1)).w
+		) / 6.0;
 
-
+	float diffused_temp = mix(temp_center, temp_neighbors, u_temp_diffusion * u_time_step);
 	
 	vel.xyz += vorticity_force.xyz;
+	vel.w = diffused_temp;
 	vec4 oColor = vec4(vel);
 	fragColor = TDOutputSwizzle(oColor);
 }
-
 
 
 ---COMPUTE DIVERGENCE---
@@ -212,12 +230,9 @@ void main()
 	vec4 oColor = vec4(divergence);
 	fragColor = TDOutputSwizzle(oColor);
 }
-
 ---COMPUTE PRESSURE---
 #define divergence_tex sTD3DInputs[0] 
 #define fb_pressure_tex sTD3DInputs[1] 
-
-uniform float u_pressure_decay;
 
 out vec4 fragColor;
 void main()
@@ -238,7 +253,7 @@ void main()
 	pressure = (pW + pE + pN + pS + pU + pD - div) * (1.0 / 6.0);
 	
 	
-	vec4 oColor = vec4(pressure) * u_pressure_decay;
+	vec4 oColor = vec4(pressure);
 	fragColor = TDOutputSwizzle(oColor);
 }
 
@@ -275,7 +290,6 @@ void main()
 	fragColor = TDOutputSwizzle(oColor);
 }
 
-
 ---ENFORCE BOUNDS---
 #define source_tex sTD3DInputs[0]
 #define boundary_tex sTD3DInputs[1]
@@ -290,6 +304,7 @@ void main()
 	float boundary = texelFetch(boundary_tex, C, 0).x;
 	vec4 source = texelFetch(source_tex, C,0);
 	vec3 new_vel = source.xyz;
+	float damp = 0.75;
 	
 	float bL = texelFetchOffset(boundary_tex, C, 0, ivec3(-1, 0, 0)).x;
 	float bR = texelFetchOffset(boundary_tex, C, 0, ivec3(1, 0, 0)).x;
@@ -301,18 +316,69 @@ void main()
 	if (boundary > 0.5) {
 		new_vel = vec3(0.0);
 	} else {
-		if (bR > 0.5 && new_vel.x > 0.0) new_vel.x *= -1.0;
-		if (bL > 0.5 && new_vel.x < 0.0) new_vel.x *= -1.0;
+		if (bR > 0.5 && new_vel.x > 0.0) new_vel.x *= -damp;
+		if (bL > 0.5 && new_vel.x < 0.0) new_vel.x *= -damp;
 
-		if (bU > 0.5 && new_vel.y > 0.0) new_vel.y *= -1.0;
-		if (bD > 0.5 && new_vel.y < 0.0) new_vel.y *= -1.0;
+		if (bU > 0.5 && new_vel.y > 0.0) new_vel.y *= -damp;
+		if (bD > 0.5 && new_vel.y < 0.0) new_vel.y *= -damp;
 
-		if (bF > 0.5 && new_vel.z > 0.0) new_vel.z *= -1.0;
-		if (bB > 0.5 && new_vel.z < 0.0) new_vel.z *= -1.0;
+		if (bF > 0.5 && new_vel.z > 0.0) new_vel.z *= -damp;
+		if (bB > 0.5 && new_vel.z < 0.0) new_vel.z *= -damp;
 	}
 	
-	vec4 color = vec4(new_vel, source.w);
+
+	vec4 color = vec4(new_vel, source.w * (1.0 - boundary));
 	fragColor = TDOutputSwizzle(color);
+}
+
+---FINAL FIXES---
+#define tex sTD3DInputs[0]
+#define bound_tex sTD3DInputs[1]
+
+uniform vec4 u_inv_dim;
+uniform float u_time_step;
+
+out vec4 fragColor;
+void main()
+{
+	vec3 vel = texture(tex, vUV.xyz).xyz;
+	float bounds = 1.0 - texture(bound_tex, vUV.xyz).x;
+		
+	vec4 oColor = vec4(vel, bounds);
+	fragColor = TDOutputSwizzle(oColor);
+}
+
+---POPs ADVECTION---
+vec3 rk4advection(sampler3D v_tex, vec3 coord, vec3 inv_dim, float time_step){
+	vec3 pos = coord;
+	
+	vec3 k1 = texture(v_tex, pos).xyz * inv_dim * time_step;
+	vec3 k2 = texture(v_tex, pos - k1 * 0.5).xyz * inv_dim * time_step;
+	vec3 k3 = texture(v_tex, pos - k2 * 0.5).xyz * inv_dim * time_step;
+	vec3 k4 = texture(v_tex, pos - k3).xyz * inv_dim * time_step;
+	
+	vec3 offset = (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0;
+	
+	return offset.xyz;
+}
+
+void main() {
+	const uint id = TDIndex();
+	if(id >= TDNumElements())
+		return;
+		
+	vec3 p = TDIn_P();
+	vec3 coords = (p / u_dim_aspect) * 0.5 + 0.5;
+	coords /= u_grid_scale;
+	vec3 vel = rk4advection(vel_tex, coords, u_inv_dim, u_delta_time);
+	
+	p += vel * 2.0 * u_grid_scale;
+	
+	float bounds = 1.0 - texture(vel_tex,coords).w;
+	
+	Life[id] += bounds * 0.1;
+	P[id] = p;
+	Vel[id] = vel;
 }
 
 
