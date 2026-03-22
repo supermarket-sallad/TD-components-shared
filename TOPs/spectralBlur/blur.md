@@ -72,14 +72,14 @@ The main limitation - apart from performance - here is that when working in freq
 
 ### Parameters
 
-|   |   |
-|---|---|
-| Preview kernels | Use the `viewConvolutionKernel` output, pre-made kernels are under the **BLUR** page |
-| Custom kernel | Link any TOP to the **Custom Convolution Kernel** input |
-| Performance | Adjust **Spectrum Pass Resolution** to control how much the image is downsampled before the frequency pass |
-| Bloom mode | Use the **PREPROCESS** page to composite the blur back over the input; set pre-blacklevel and brightness|
-| Glow effect | Enable **Desaturate Bright Points** — very bright light naturally shifts toward white |
-| Luma blur | Link a TOP to the **Attenuate Map** parameter |
+It has some pre-made convolution kernels under the BLUR page - that you can view with the "viewConvolutionKernel" - output
+You can also use your own kernel by linking a TOP to the "Custom Convolution Kernel" 
+
+Things to be aware of: This is an expensive effect. in order to keep it a bit smoother - I downsample the image before coonverting it to a frequency. You can change by how much in the "Spectrum Pass Resolution" parameter.
+
+If you want this to be a Bloom rather than a blur - you can use the PREPROCESS page to composite the blur with the input. here - you can also set the pre blacklevel and brigtness. you can also use the desaturate bright points to create more of a glow - since really bright light tend to shift toward light.
+
+if you want a (kind of) luma blur - you can link a TOP to the "Attenuate Map" parameter.
 
 >  **Performance note:** This is an expensive effect. Lowering the Spectrum Pass Resolution will help keep things smooth.
 
