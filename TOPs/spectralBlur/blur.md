@@ -68,7 +68,7 @@ The main limitation - apart from performance - here is that when working in freq
 
 ## Using the Component
 
-[Download the component here](#) *(link)*
+[Download the component here](https://github.com/supermarket-sallad/TD-components-shared/tree/main/TOPs/spectralBlur)
 
 ### Parameters
 
