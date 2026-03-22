@@ -1,17 +1,17 @@
-# minding the blur
+## minding the blur
 ### Frequency-Domain Convolution
 
 Inspired by [this video](https://www.youtube.com/watch?v=ml-5OGZC7vE) — go watch it to hear from an actual expert :)
 
 ---
 
-## What is Blur?
+### What is Blur?
 
 At its core, a blur removes fine detail while preserving the larger shapes and forms of an image. A useful way to think about it: **blur is a Low Pass Filter** —  it strips out high-frequency detail (sharp edges, fine detail) while letting through the low-frequency content (broad shapes, gradual colour transitions). Let's keep the idea of a Low Pass Filter in the back of our mind and we will get back to it.
 
 ---
 
-## How Does Blur Work?
+### How Does Blur Work?
 
 The classic approach uses a **kernel**: each pixel looks at its surrounding neighbours and averages their values. You can get fancy with how you weight those values or use different kernel shapes — but the underlying principle is always the same: sample a neighbourhood and average it out.
 
@@ -26,7 +26,7 @@ Since blur is a Low Pass Filter, what if we could split the image into a **frequ
 This would mean:
 - A massive blur costs exactly the same as a small one
 - You get full artistic control over the frequency spectrum
-- You can create different shapes — streaks, hexagons, custom and kernels trivially
+- You can create different shapes — streaks, hexagons, and custom kernels trivially
 
 And then just convert that frequency-representation back to a regular image-representation?
 
@@ -38,7 +38,7 @@ This allows convert a channel, red, green, or blue from image space to frequency
 
 ---
 
-## The Signal Chain
+### The Signal Chain
 
 ```
 Spectrum TOP (DFT)  →  Convolution Pass  →  Spectrum TOP (Inverse DFT)
@@ -66,7 +66,7 @@ The main limitation - apart from performance - here is that when working in freq
 
 ---
 
-## Using the Component
+### Using the Component
 
 [Download the component here](https://github.com/supermarket-sallad/TD-components-shared/tree/main/TOPs/spectralBlur)
 
@@ -85,7 +85,7 @@ if you want a (kind of) luma blur - you can link a TOP to the "Attenuate Map" pa
 
 ---
 
-##  Known Issue
+###  Known Issue
 
 The `Spectrum TOP` has been acting strangely lately — flickering and exploding values, especially when middle-mouse-clicking on operators. You might need to turn off and on the component. I've filed a bugreport about it. **Use this component with caution for now.** and see exxample file for some ways to mitigate it.
 
