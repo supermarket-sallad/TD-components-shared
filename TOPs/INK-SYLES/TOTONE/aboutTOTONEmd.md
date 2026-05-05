@@ -1,4 +1,4 @@
-# Emulates a 2-Drum Riso Printer
+# TOTONE.tox
 
 On a Riso printer, you can only print with 2 inks
 (you _could_ do more, but usually there are just 2 drums in there).
@@ -16,12 +16,18 @@ In order to emulate ink, this works in **CMYK color space**.
 
 ---
 
-## COLORS TAB
-
-- **RGB Color 1** – ink color 1
-- **RGB Color 2** – ink color 2
+## INKS TAB
 
 Here you can set the two ink colors we will use.
+The order matters. I first prints the first color. and then the second.
+
+- **Paper Color** - set the color of the background/paper - white is a sensible choice here.
+
+- **RGB Color 1** – ink color 1
+- **Opacity 1** - set hte opacity of ink 1. if full opcity - it doesn't blend with the background at all. at 0 opacity it blends(multiplicatively) completely with paper color.
+
+- **RGB Color 2** – ink color 2
+- **Opacity 1** - set hte opacity of ink 1. if full opcity - it doesn't blend with the background at all. at 0 opacity it blends(multiplicatively) completely with the previous layers.
 
 ---
 
@@ -32,9 +38,10 @@ If enabled, it updates automatically when you change colors.
 
 ---
 
-### CMYK Weights for Color\*
+### CMYK Weights for Color
 
 Here you set how much the CMYK components contribute to each color.
+The weight means - how much of the each CMYK from the input image contributes to this ink.
 
 ---
 
@@ -70,7 +77,6 @@ _(only available if Halftone Type = Halftone)_
 - **Random Scatter** – randomly offsets points
 - **Rotate Layer 1 / 2** – rotates each pattern grid independently
 - **Halftone Bleed** – how much points bleed into neighbors
-- **Halftone Threshold** – lifts the minimum dot size
 - **Shape** – select from different shapes
 - **Style** – soft or hard halftone
 - **Sample Exact Cell** – disable for line shapes; affects how the input is sampled
