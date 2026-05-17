@@ -6,6 +6,9 @@ float sdBox( vec3 p, vec3 b )
 
 float map(vec3 p){
 	float d = sdBox(p, vec3(0.5));
+	
+	//d = max(d, sdBox(p, vec3(0.2, 0.2, 0.5)));
+	
 	return d;
 }
 
