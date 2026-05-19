@@ -16,7 +16,7 @@ float sampleCurlMag(uint pointId) {
     return TDIn_Curl(0, pointId).w;
 }
 
-float sampleTemp(uint pointId){
+vec3 sampleTemp(uint pointId){
 	return TDIn_Temp(0, pointId);
 }
 
@@ -44,8 +44,8 @@ vec3 getCurlGradient(uint id){
 	return safenorm3(curlGradient);
 }
 
-float getDiffusedTemp(uint id){
-	float tempCenter = TDIn_Temp(0, id);
+vec3 getDiffusedTemp(uint id){
+	vec3 tempCenter = TDIn_Temp(0, id);
 	
 	uint coords[3] = TDDimCoords(id);
     
@@ -56,7 +56,7 @@ float getDiffusedTemp(uint id){
     	
     ivec3 c = ivec3(coords[0], coords[1], coords[2]);
 	
-	float tempNebs = (
+	vec3 tempNebs = (
 		sampleTemp(safePointIndex(c + ivec3(1,0,0),  dims)) +
 		sampleTemp(safePointIndex(c + ivec3(-1,0,0), dims)) +
 		sampleTemp(safePointIndex(c + ivec3(0,1,0),  dims)) +
@@ -65,7 +65,7 @@ float getDiffusedTemp(uint id){
 		sampleTemp(safePointIndex(c + ivec3(0,0,-1), dims))
 		) / 6.0;
 		
-		float diffusedTemp = mix(tempCenter, tempNebs, u_tempDiffusion * u_timeStep);
+		vec3 diffusedTemp = mix(tempCenter, tempNebs, u_tempDiffusion * u_timeStep);
 	
 	return diffusedTemp;
 }
