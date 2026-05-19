@@ -27,12 +27,13 @@ void main() {
 		float splatMask = smoothstep(0.00, -soften * splatSize, splatD);
 		
 		vel += TDIn_Vel_fs3(1, i) * splatMask;
+		temp += TDIn_Temp_fs3(1, i) * splatMask;
 		
 #ifndef UPSCALE_COLOR
 		color += TDIn_Color_fs3(1, i) * splatMask;
 #endif
 		
-		temp += TDIn_Temp_fs3(1, i) * splatMask;
+		
 	
 	}
 	
